@@ -16,7 +16,7 @@ on:
 jobs:
   build-and-test:
     runs-on: windows-latest
-    env:
+    # env:
       # AppSettings__UserId: ${{secrets.RANDOM_USER_ID}}
       # AppSettings__CW1Settings__Password: ${{secrets.CW1_EADAPTOR_PASSWORD}}
 
