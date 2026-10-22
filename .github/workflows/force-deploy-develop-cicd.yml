@@ -1,0 +1,74 @@
+name: force-deploy-develop-cicd
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Required: Reason for force deployment to DEVELOP'
+        required: true
+        type: string
+
+jobs:
+  force-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Validate branch
+        run: |
+          if [[ "${{github.ref_name}}" != develop ]]; then
+            echo "This workflow can only be triggered from the develop branch."
+            echo "Current branch: ${{github.ref_name}}"
+            exit 1
+          fi
+
+      - name: Log force deploy reason
+        run: |
+          echo "## Force Deploy -> DEVELOP" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{github.actor}}" >> $GITHUB_STEP_SUMMARY
+          echo "**Reason:** ${{github.event.inputs.reason}}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:**" ${{github.ref_name}} >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:**" ${{github.sha}} >> $GITHUB_STEP_SUMMARY
+
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET Core
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+      
+      - name: Publish
+        run: dotnet publish ./API/API.csproj -c Release -o "${{env.DOTNET_ROOT}}/myapp"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: .net-app
+          path: ${{env.DOTNET_ROOT}}/myapp
+
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: force-deploy
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: .net-app
+      
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'api-mvt-sdet-poc-develop'
+          slot-name: 'Production'
+          package: .
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_3D02C3430C474F54A09C56C156DFC434 }}       
